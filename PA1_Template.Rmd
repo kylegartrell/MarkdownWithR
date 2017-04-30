@@ -1,0 +1,130 @@
+---
+title: "Week 2 Homework"
+author: "Kyle"
+date: "Monday, April 24, 2017"
+output:
+  pdf_document: default
+  html_document: default
+  word_document: default
+---
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+Read in the dataset Activity monitoring data as a csv file.
+
+```{r}
+library(plyr)
+library(ggplot2)
+stepData <- read.csv("C:/Users/Kyle/Downloads/RdataFiles/repdata%2Fdata%2Factivity/activity.csv")
+stepData$date <- as.Date(stepData$date,"%Y-%m-%d")
+```
+
+Find the mean and median:
+
+```{r}
+mean(stepData$steps,na.rm=TRUE)
+median(stepData$steps,na.rm=TRUE)
+```
+
+Plot a histogram of the total number of steps taken each day:
+
+```{r}
+hist <- ggplot(stepData)+
+  geom_histogram(aes(x=date,weight=steps))+
+  ggtitle("Histogram of Total Steps")+
+  ylab("Total Steps in a day")+
+  xlab("Date")+
+  theme(plot.title = element_text(color="black", size=25, face="bold.italic"),
+        axis.text.x=element_text(angle=90,vjust=.5,hjust=1))
+hist
+```
+
+Time series plot of the average number of steps taken.  The first graph is to verify the line (second) graph:
+
+```{r}
+average <- ddply(stepData,~date,summarise,avg=mean(steps,na.rm=TRUE))
+gplotT <- ggplot(average)+
+  geom_histogram(aes(x=date,weight=avg))+
+  ggtitle("Histogram of Average Steps Each Day")+
+  ylab("Average Steps in a day")+
+  xlab("Date")+
+  theme(plot.title = element_text(color="black", size=25, face="bold.italic"),
+        axis.text.x=element_text(angle=90,vjust=.5,hjust=1))
+
+intervals <- ddply(stepData,~interval,summarise,avg=mean(steps,na.rm=TRUE))
+plot(intervals$interval,intervals$avg,type="l",
+     main="Average Steps across 5 Min Interval", ylab="Average Steps", xlab="5 Min Interval")
+```
+
+5-minute interval that, on average, contains the maximum number of steps:
+
+```{r}
+intervals[intervals$avg==max(intervals$avg),]
+```
+
+Code to describe and show a strategy for imputing missing data:
+
+Keeping it simple and using the mean of the specific interval to impute the missing values.
+
+```{r}
+avgDay <- ddply(stepData,~date+interval,avg=mean(steps,na.rm=TRUE))
+dailyAvg <- aggregate(avgDay$steps,format(avgDay['date'],'%d'),mean)
+stepData2 <- stepData
+stepData2[is.na(stepData2$steps),'steps'] <- intervals$avg
+```
+
+Histogram of the new dataset.  Also find the new mean and median:
+
+```{r}
+hist2 <- ggplot(stepData2)+
+  geom_histogram(aes(x=date,weight=steps))+
+  ggtitle("Histogram of Total Steps")+
+  ylab("Total Steps in a day")+
+  xlab("Date")+
+  theme(plot.title = element_text(color="black", size=25, face="bold.italic"),
+        axis.text.x=element_text(angle=90,vjust=.5,hjust=1))
+hist2
+mean(stepData2$steps)
+median(stepData2$steps)
+```
+
+
+Compare the old average steps with the new average steps with the imputed data.
+
+```{r}
+avgDay2 <- ddply(stepData2,~date+interval,avg=mean(steps))
+View(cbind(avgDay2,avgDay))
+```
+
+The median and mean from the old dataset and new dataset are the same.
+
+```{r}
+mean(stepData2$steps)
+median(stepData2$steps)
+mean(stepData$steps,na.rm=TRUE)
+median(stepData$steps,na.rm=TRUE)
+```
+
+Add new column indicating if a date is a weekday or weekend.
+
+```{r}
+weekdays <- c("Monday","Tuesday","Wednesday","Thursday","Friday")
+weekends <- c("Saturday","Sunday")
+stepData2$day <- weekdays(stepData2$date)
+stepData2[stepData2$day%in%weekdays,'day'] <- "weekday"
+stepData2[stepData2$day%in%weekends,'day'] <- "weekend"
+stepData2$day <- factor(stepData2$day)
+```
+
+Make a panel plot with a time series of average steps based on weekday or weekend.
+
+```{r}
+avgDay3 <- ddply(stepData2,~interval+day,summarise,steps=as.double(format(mean(steps),option=4)))
+lineplot <- ggplot(avgDay3)+
+  geom_line(aes(x=interval,y=steps,colour=day,group=day))+
+  ggtitle("Line Plot of Average Steps for Each Interval")+
+  facet_grid(day~.)
+lineplot
+```
+
+
